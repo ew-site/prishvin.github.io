@@ -5,357 +5,1143 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Маршрут М. Пришвина — «В краю непуганых птиц»</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+
+    <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
     <style>
-        body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
-        header { text-align:center; padding:14px 10px; background:#f7f7f7; box-shadow:0 1px 2px rgba(0,0,0,.06); }
-        h1 { margin:0; font-size:20px; }
-        #wrap { display:flex; height:calc(100vh - 56px); gap:10px; padding:10px; box-sizing:border-box; }
-        #map { flex:1; border-radius:6px; }
-        #sidebar { width:360px; max-width:40%; background:#fff; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,.08); padding:10px; overflow:auto; }
-        .point { padding:8px; border-bottom:1px solid #eee; cursor:pointer; }
-        .point:hover { background:#f0f8ff; }
-        .point .title { font-weight:700; }
-        .controls { margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap; }
-        .btn { padding:6px 10px; border:1px solid #ccc; background:#fafafa; border-radius:4px; cursor:pointer; }
-        @media (max-width:900px) {
-            #wrap { flex-direction:column; }
-            #sidebar { width:100%; max-height:260px; }
-            #map { height:60vh; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #f4efe4;
+            --bg2:       #ece6d8;
+            --bg3:       #e0d8c6;
+            --gold:      #5c3e0e;
+            --gold-lt:   #2e1a04;
+            --text:      #1e130a;
+            --text-dim:  #6b4a22;
+            --border:    rgba(90,60,15,.16);
+        }
+
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Cormorant Garamond', Georgia, serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* grain overlay */
+        body::before {
+            content:''; position:fixed; inset:0;
+            background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+            pointer-events:none; z-index:9990; opacity:.4;
+        }
+
+        /* ══════ NAV ══════ */
+        nav {
+            display:flex; align-items:stretch;
+            height:50px; flex-shrink:0;
+            background:var(--bg); border-bottom:1px solid var(--border);
+            position:relative; z-index:300;
+        }
+        nav::after {
+            content:''; position:absolute; bottom:-2px; left:0; right:0;
+            height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); opacity:.35;
+        }
+        .site-brand {
+            flex-shrink:0; display:flex; align-items:center;
+            padding:0 20px 0 22px;
+            border-right:1px solid var(--border);
+            font-family:'IM Fell English',serif;
+            font-size:15px; font-weight:400;
+            color:var(--gold-lt); letter-spacing:.05em;
+            line-height:1.25; max-width:min(44vw,300px);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            user-select:none;
+        }
+        .nav-links {
+            flex:1; display:flex; justify-content:center; align-items:stretch;
+            min-width:0;
+        }
+        nav a {
+            color:var(--text-dim); text-decoration:none;
+            font-family:'Cormorant Garamond',serif;
+            font-size:13.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase;
+            padding:0 22px; display:flex; align-items:center;
+            border-right:1px solid var(--border); cursor:pointer;
+            transition:color .2s, background .2s;
+        }
+        .nav-links a:first-child { border-left:1px solid var(--border); }
+        nav a:hover { color:var(--gold-lt); background:rgba(90,60,15,.06); }
+        nav a.active { color:var(--gold-lt); box-shadow:inset 0 -2px 0 var(--gold); }
+
+        /* hamburger (mobile) */
+        .nav-burger {
+            display:none; align-items:center; justify-content:center;
+            width:50px; border:none; background:transparent; cursor:pointer;
+            color:var(--text-dim); font-size:20px; flex-shrink:0;
+            border-left:1px solid var(--border);
+        }
+        .nav-menu-overlay {
+            display:none; position:fixed; inset:0; z-index:290;
+            background:rgba(244,239,228,.0);
+        }
+        .nav-menu-overlay.open { display:block; }
+        .nav-dropdown {
+            display:none; position:absolute; top:50px; left:0; right:0;
+            background:var(--bg); border-bottom:1px solid var(--border);
+            flex-direction:column; z-index:295; box-shadow:0 4px 16px rgba(0,0,0,.1);
+        }
+        .nav-dropdown.open { display:flex; }
+        .nav-dropdown a {
+            border-right:none; border-bottom:1px solid var(--border);
+            padding:14px 22px; font-size:15px;
+            justify-content:flex-start;
+        }
+        .nav-dropdown a:last-child { border-bottom:none; }
+
+        /* ══════ PAGE SYSTEM ══════ */
+        .page { display:none; flex:1; overflow:hidden; min-height:0; }
+        .page.active { display:flex; }
+
+        /* ══════ SIMPLE PAGES ══════ */
+        .simple-page {
+            flex:1; overflow-y:auto; padding:52px 72px;
+            background:var(--bg2); max-width:860px; margin:0 auto; width:100%;
+        }
+        .simple-page::-webkit-scrollbar { width:4px; }
+        .simple-page::-webkit-scrollbar-thumb { background:var(--gold); border-radius:2px; opacity:.5; }
+
+        .page-title {
+            font-family:'IM Fell English',serif;
+            font-size:38px; font-weight:400; color:var(--gold-lt);
+            letter-spacing:.03em; margin-bottom:8px; line-height:1.15;
+        }
+        .page-subtitle {
+            font-size:15px; color:var(--text-dim); font-style:italic;
+            margin-bottom:34px; letter-spacing:.03em;
+        }
+        .page-divider {
+            height:1px; background:linear-gradient(90deg,var(--gold),transparent);
+            opacity:.4; margin-bottom:40px;
+        }
+        .page-section { margin-bottom:40px; }
+        .page-section h3 {
+            font-family:'IM Fell English',serif; font-size:21px;
+            color:var(--gold-lt); letter-spacing:.04em; margin-bottom:14px;
+            font-weight:400; border-bottom:1px solid var(--border);
+            padding-bottom:8px;
+        }
+        .page-section p {
+            font-size:16px; line-height:1.85; color:var(--text); margin-bottom:14px;
+        }
+        .page-section p em { color:var(--text-dim); }
+        .bib-item {
+            font-size:15px; line-height:1.8; color:var(--text);
+            padding:11px 0; border-bottom:1px solid var(--border);
+        }
+        .bib-item span { color:var(--text-dim); font-style:italic; }
+        .contact-block {
+            display:flex; flex-direction:column; gap:10px; margin-top:10px;
+        }
+        .contact-row {
+            display:flex; align-items:flex-start; gap:20px;
+            padding:14px 18px; border:1px solid var(--border);
+            background:rgba(90,60,15,.04); border-radius:3px;
+        }
+        .contact-row .label {
+            font-family:'IM Fell English',serif; font-size:13px;
+            color:var(--gold); letter-spacing:.1em; text-transform:uppercase;
+            min-width:140px; margin-top:1px; flex-shrink:0;
+        }
+        .contact-row .value { font-size:15px; color:var(--text); line-height:1.6; }
+        .placeholder-note {
+            font-size:14px; color:var(--text-dim); font-style:italic;
+            padding:14px 18px; border:1px dashed rgba(90,60,15,.25);
+            border-radius:3px; line-height:1.7;
+        }
+
+        /* ══════ МАРШРУТ PAGE — DESKTOP ══════ */
+        #page-route { flex-direction:row; }
+
+        /* sidebar */
+        #sidebar {
+            width:256px; flex-shrink:0;
+            background:var(--bg2); border-right:1px solid var(--border);
+            display:flex; flex-direction:column; overflow:hidden;
+        }
+        #sidebar-header {
+            padding:16px 18px 12px; border-bottom:1px solid var(--border); flex-shrink:0;
+        }
+        #sidebar-header h2 {
+            font-family:'IM Fell English',serif; font-size:15px;
+            font-weight:400; color:var(--gold-lt); letter-spacing:.03em;
+            line-height:1.4; margin-bottom:5px;
+        }
+        #sidebar-header p { font-size:12px; color:var(--text-dim); font-style:italic; }
+        .controls {
+            padding:8px 10px; display:flex; gap:6px;
+            border-bottom:1px solid var(--border); flex-shrink:0;
+        }
+        .btn {
+            flex:1; padding:7px 4px;
+            border:1px solid var(--border); background:var(--bg3);
+            color:var(--text-dim); border-radius:3px; cursor:pointer;
+            font-family:'Cormorant Garamond',serif;
+            font-size:12px; letter-spacing:.07em; text-transform:uppercase;
+            font-weight:600;
+            transition:background .2s, color .2s, border-color .2s;
+        }
+        .btn:hover { background:rgba(90,60,15,.1); color:var(--gold-lt); border-color:var(--gold); }
+        .btn:active { background:rgba(90,60,15,.18); }
+
+        #pointsList { overflow-y:auto; flex:1; }
+        #pointsList::-webkit-scrollbar { width:3px; }
+        #pointsList::-webkit-scrollbar-thumb { background:var(--gold); border-radius:2px; opacity:.5; }
+
+        .point {
+            padding:10px 16px; border-bottom:1px solid var(--border);
+            cursor:pointer; display:flex; align-items:center; gap:10px;
+            transition:background .14s;
+        }
+        .point:hover { background:rgba(90,60,15,.06); }
+        .point.active { background:rgba(90,60,15,.12); border-left:3px solid var(--gold); padding-left:13px; }
+        .point-num {
+            font-family:'IM Fell English',serif; font-size:15px;
+            color:var(--gold); min-width:20px; text-align:center; flex-shrink:0;
+            opacity:.75;
+        }
+        .point-title { font-size:14px; font-weight:600; color:var(--text); line-height:1.3; }
+
+        /* center panel */
+        #center {
+            flex:1; display:flex; flex-direction:column;
+            overflow:hidden; background:var(--bg); border-right:1px solid var(--border);
+        }
+        #center-scroll { flex:1; overflow-y:auto; padding:30px 36px; }
+        #center-scroll::-webkit-scrollbar { width:3px; }
+        #center-scroll::-webkit-scrollbar-thumb { background:var(--gold); border-radius:2px; }
+
+        #center-empty {
+            display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            height:100%; gap:14px; opacity:.32; user-select:none;
+        }
+        #center-empty .icon { font-size:36px; color:var(--gold); }
+        #center-empty p {
+            font-family:'IM Fell English',serif; font-size:15px;
+            color:var(--text-dim); text-align:center; font-style:italic; letter-spacing:.04em;
+            line-height:1.6;
+        }
+
+        #center-detail { display:none; }
+        #center-detail.visible { display:block; }
+
+        .detail-num {
+            font-family:'Cormorant Garamond', Georgia, serif;
+            font-size:13px; font-weight:500;
+            color:var(--gold); letter-spacing:.18em;
+            text-transform:uppercase; margin-bottom:8px;
+            font-variant-numeric: lining-nums;
+        }
+        .detail-name {
+            font-family:'IM Fell English',serif; font-size:30px;
+            color:var(--gold-lt); letter-spacing:.02em;
+            line-height:1.2; margin-bottom:22px;
+        }
+        .divider {
+            height:1px; background:linear-gradient(90deg,var(--gold),transparent);
+            opacity:.35; margin-bottom:24px;
+        }
+        .section-label {
+            font-family:'IM Fell English',serif; font-size:13px;
+            letter-spacing:.18em; text-transform:uppercase;
+            color:var(--gold); margin-bottom:9px; opacity:1;
+        }
+        .section-text {
+            font-size:17px; line-height:1.85; color:var(--text); margin-bottom:26px;
+        }
+        .quote-block {
+            border-left:2px solid var(--gold); padding:10px 16px;
+            margin:0 0 24px; background:rgba(90,60,15,.05);
+        }
+        .quote-label {
+            font-family:'IM Fell English',serif;
+            font-size:10px; letter-spacing:.22em; text-transform:uppercase;
+            color:var(--gold); margin-bottom:8px; opacity:.75;
+        }
+        .quote-block p {
+            font-size:16px; font-style:italic; color:var(--text-dim); line-height:1.82;
+        }
+
+        /* right column */
+        #right {
+            width:320px; flex-shrink:0;
+            display:flex; flex-direction:column; overflow:hidden; background:var(--bg2);
+        }
+        #map-wrap {
+            flex:0 0 56%; display:flex; flex-direction:column;
+            border-bottom:1px solid var(--border);
+        }
+        #map-header {
+            padding:8px 14px; flex-shrink:0;
+            border-bottom:1px solid var(--border);
+            font-family:'IM Fell English',serif; font-size:13px;
+            color:var(--gold-lt); letter-spacing:.05em;
+        }
+        #map { flex:1; }
+        #photos-wrap {
+            flex:1; overflow:hidden; display:flex; flex-direction:column;
+        }
+        #photos-header {
+            padding:8px 14px; flex-shrink:0;
+            border-bottom:1px solid var(--border);
+            font-family:'IM Fell English',serif; font-size:13px;
+            color:var(--gold-lt); letter-spacing:.05em;
+        }
+        #photos-scroll {
+            flex:1; overflow-y:auto; padding:8px 10px;
+            display:flex; flex-direction:column; gap:8px;
+        }
+        #photos-scroll::-webkit-scrollbar { width:3px; }
+        #photos-scroll::-webkit-scrollbar-thumb { background:var(--gold); border-radius:2px; }
+
+        .photo-item { border:1px solid var(--border); overflow:hidden; border-radius:3px; }
+        .photo-item img { width:100%; display:block; filter:sepia(15%) brightness(.97); transition:filter .2s; }
+        .photo-item:hover img { filter:sepia(5%) brightness(1.02); }
+        .photo-caption {
+            padding:5px 9px; font-size:11px; font-style:italic;
+            color:var(--text-dim); border-top:1px solid var(--border);
+            background:rgba(90,60,15,.04); line-height:1.5;
+        }
+        #photos-empty {
+            display:flex; align-items:center; justify-content:center;
+            height:100%; font-style:italic; color:var(--text-dim);
+            font-size:13px; opacity:.45; text-align:center; padding:14px; line-height:1.6;
+        }
+
+        /* MapLibre overrides */
+        .maplibregl-ctrl-group { background:var(--bg2)!important; border:1px solid var(--border)!important; box-shadow:none!important; }
+        .maplibregl-ctrl-group button { background:var(--bg2)!important; border-bottom:1px solid var(--border)!important; }
+        .maplibregl-ctrl-group button:hover { background:var(--bg3)!important; }
+        .maplibregl-ctrl-icon { filter:invert(25%) sepia(40%) saturate(400%) hue-rotate(10deg); }
+        .maplibregl-ctrl-attrib { background:rgba(244,239,228,.92)!important; color:var(--text-dim)!important; font-size:10px!important; }
+        .maplibregl-ctrl-attrib a { color:var(--gold)!important; }
+
+        #credit {
+            position:fixed; right:14px; bottom:10px;
+            font-size:11px; color:var(--text-dim);
+            background:rgba(244,239,228,.92);
+            padding:4px 10px; border:1px solid var(--border); border-radius:2px;
+            z-index:9999; pointer-events:none; letter-spacing:.04em; font-style:italic;
+        }
+
+        /* ══════ MOBILE TAB BAR ══════ */
+        #mobile-tabs {
+            display:none;
+            flex-shrink:0; height:48px;
+            background:var(--bg); border-top:1px solid var(--border);
+            z-index:200;
+        }
+        .mob-tab {
+            flex:1; display:flex; flex-direction:column;
+            align-items:center; justify-content:center;
+            gap:3px; cursor:pointer; border:none; background:transparent;
+            color:var(--text-dim); font-family:'Cormorant Garamond',serif;
+            font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+            font-weight:600; transition:color .15s;
+            border-right:1px solid var(--border);
+        }
+        .mob-tab:last-child { border-right:none; }
+        .mob-tab .mob-icon { font-size:16px; line-height:1; }
+        .mob-tab.active { color:var(--gold-lt); box-shadow:inset 0 2px 0 var(--gold); }
+
+        /* ══════ RESPONSIVE ══════ */
+        @media (max-width: 768px) {
+            /* nav */
+            .site-brand { font-size:13px; max-width:60vw; padding:0 14px; }
+            .nav-links { display:none; }
+            .nav-burger { display:flex; }
+
+            /* simple pages */
+            .simple-page { padding:32px 22px; }
+            .page-title { font-size:28px; }
+            .page-section h3 { font-size:18px; }
+            .page-section p { font-size:15px; }
+            .contact-row { flex-direction:column; gap:4px; }
+            .contact-row .label { min-width:unset; }
+
+            /* route page — vertical stack */
+            #page-route { flex-direction:column; position:relative; }
+
+            /* sidebar becomes panel 0 */
+            #sidebar {
+                width:100%; flex:1; border-right:none;
+                border-bottom:1px solid var(--border);
+                display:none;
+            }
+            #sidebar.mob-active { display:flex; }
+
+            /* center becomes panel 1 */
+            #center {
+                flex:1; border-right:none;
+                display:none;
+            }
+            #center.mob-active { display:flex; }
+
+            /* right: map on top full-width + photos below */
+            #right {
+                width:100%; flex:1;
+                display:none; flex-direction:column;
+            }
+            #right.mob-active { display:flex; }
+            #map-wrap { flex:0 0 55%; }
+
+            /* mobile tabs visible */
+            #mobile-tabs { display:flex; }
+
+            /* #credit hidden on mobile */
+            #credit { display:none; }
+
+            /* center scroll padding */
+            #center-scroll { padding:20px 18px; }
+            .detail-name { font-size:24px; }
+            .section-text { font-size:15px; }
+        }
+
+        @media (max-width: 480px) {
+            .site-brand { font-size:12px; padding:0 10px; }
+            nav { height:46px; }
+            .simple-page { padding:24px 16px; }
+            .page-title { font-size:24px; }
+            #center-scroll { padding:16px 14px; }
+            .detail-name { font-size:22px; }
         }
     </style>
 </head>
 <body>
 
-<header><h1>Маршрут М. Пришвина — «В краю непуганых птиц»</h1></header>
+<!-- NAV -->
+<nav>
+    <div class="site-brand">В краю непуганных птиц</div>
+    <div class="nav-links">
+        <a href="#" data-page="about">О проекте</a>
+        <a href="#" data-page="route" class="active">Маршрут</a>
+        <a href="#" data-page="biblio">Библиография</a>
+        <a href="#" data-page="contacts">Контакты</a>
+    </div>
+    <button class="nav-burger" id="nav-burger" aria-label="Меню">☰</button>
+</nav>
+<div class="nav-menu-overlay" id="nav-overlay"></div>
+<div class="nav-dropdown" id="nav-dropdown">
+    <a href="#" data-page="about">О проекте</a>
+    <a href="#" data-page="route" class="active">Маршрут</a>
+    <a href="#" data-page="biblio">Библиография</a>
+    <a href="#" data-page="contacts">Контакты</a>
+</div>
 
-<div id="wrap">
-    <div id="map"></div>
+<!-- ══ PAGE: О ПРОЕКТЕ ══ -->
+<div class="page" id="page-about">
+    <div class="simple-page">
+        <div class="page-title">О проекте</div>
+        <div class="page-subtitle">Дипломная работа · [Название учебного заведения] · [Год]</div>
+        <div class="page-divider"></div>
+
+        <div class="page-section">
+            <h3>Цель проекта</h3>
+            <p class="placeholder-note">Здесь будет описание цели дипломной работы. Отредактируйте этот текст.</p>
+        </div>
+
+        <div class="page-section">
+            <h3>Об авторе</h3>
+            <div class="contact-block">
+                <div class="contact-row">
+                    <div class="label">Автор текста</div>
+                    <div class="value">Арина Завьялова</div>
+                </div>
+                <div class="contact-row">
+                    <div class="label">Разработка сайта</div>
+                    <div class="value">Антон Лейманн</div>
+                </div>
+                <div class="contact-row">
+                    <div class="label">Научный руководитель</div>
+                    <div class="value"><em>Будет добавлено</em></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-section">
+            <h3>О Михаиле Пришвине</h3>
+            <p>Михаил Михайлович Пришвин (1873–1954) — русский советский писатель, прозаик и публицист. Один из наиболее самобытных писателей в русской литературе XX века, певец природы и русского Севера.</p>
+            <p>В 1906 году Пришвин предпринял экспедицию в Олонецкую губернию, результатом которой стал сборник очерков <em>«В краю непуганых птиц»</em> (1907). Эта книга принесла ему широкую известность и стала первым крупным литературным произведением писателя.</p>
+        </div>
+
+        <div class="page-section">
+            <h3>О сборнике «В краю непуганых птиц»</h3>
+            <p class="placeholder-note">Здесь будет подробное описание сборника. Отредактируйте этот текст по своему усмотрению.</p>
+        </div>
+
+        <div class="page-section">
+            <h3>Об интерактивной карте</h3>
+            <p>Карта воссоздаёт маршрут Пришвина по Олонецкому краю в 1906 году. 15 точек маршрута соответствуют географическим объектам, упомянутым или описанным в сборнике очерков. Каждая точка содержит географическое описание, историческую справку и цитату из произведения.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ══ PAGE: МАРШРУТ ══ -->
+<div class="page active" id="page-route">
     <aside id="sidebar">
+        <div id="sidebar-header">
+            <h2>Маршрут М. Пришвина<br>«В краю непуганых птиц»</h2>
+            <p>Экспедиция 1906 года по Олонецкому краю</p>
+        </div>
         <div class="controls">
             <button id="fitAll" class="btn">Показать всё</button>
-            <button id="toggleRoute" class="btn">Показать/скрыть маршрут</button>
+            <button id="toggleRoute" class="btn">Маршрут</button>
         </div>
         <div id="pointsList"></div>
     </aside>
+
+    <div id="center">
+        <div id="center-scroll">
+            <div id="center-empty">
+                <div class="icon">✦</div>
+                <p>Выберите точку маршрута<br>на карте или в списке слева</p>
+            </div>
+            <div id="center-detail"></div>
+        </div>
+    </div>
+
+    <div id="right">
+        <div id="map-wrap">
+            <div id="map-header">Карта маршрута</div>
+            <div id="map"></div>
+        </div>
+        <div id="photos-wrap">
+            <div id="photos-header">Иллюстрации</div>
+            <div id="photos-scroll">
+                <div id="photos-empty">Выберите точку маршрута</div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<!-- ══ PAGE: БИБЛИОГРАФИЯ ══ -->
+<div class="page" id="page-biblio">
+    <div class="simple-page">
+        <div class="page-title">Библиография</div>
+        <div class="page-subtitle">Список использованной литературы и источников</div>
+        <div class="page-divider"></div>
+
+        <div class="page-section">
+            <h3>Источники</h3>
+            <p class="placeholder-note">Здесь будет список литературы. Добавьте источники в нужном формате.</p>
+            <div style="margin-top:16px;">
+                <div class="bib-item">
+                    Пришвин М. М. <span>В краю непуганых птиц: очерки Выговского края.</span> — СПб., 1907.
+                </div>
+                <div class="bib-item">
+                    <span>[Источник 2 — добавьте сами]</span>
+                </div>
+                <div class="bib-item">
+                    <span>[Источник 3 — добавьте сами]</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-section">
+            <h3>Дополнительная литература</h3>
+            <div>
+                <div class="bib-item"><span>[Будет добавлено]</span></div>
+                <div class="bib-item"><span>[Будет добавлено]</span></div>
+            </div>
+        </div>
+
+        <div class="page-section">
+            <h3>Интернет-ресурсы</h3>
+            <div>
+                <div class="bib-item"><span>[Будет добавлено]</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ PAGE: КОНТАКТЫ ══ -->
+<div class="page" id="page-contacts">
+    <div class="simple-page">
+        <div class="page-title">Контакты</div>
+        <div class="page-subtitle">Связь с авторами проекта</div>
+        <div class="page-divider"></div>
+
+        <div class="page-section">
+            <h3>Авторы</h3>
+            <div class="contact-block">
+                <div class="contact-row">
+                    <div class="label">Текст и идея</div>
+                    <div class="value">
+                        Арина Завьялова<br>
+                        <em style="font-size:13px;color:var(--text-dim)">Добавьте контактные данные</em>
+                    </div>
+                </div>
+                <div class="contact-row">
+                    <div class="label">Разработка</div>
+                    <div class="value">
+                        Антон Лейманн<br>
+                        <em style="font-size:13px;color:var(--text-dim)">Добавьте контактные данные</em>
+                    </div>
+                </div>
+                <div class="contact-row">
+                    <div class="label">Учебное заведение</div>
+                    <div class="value"><em style="color:var(--text-dim)">Будет добавлено</em></div>
+                </div>
+                <div class="contact-row">
+                    <div class="label">Год</div>
+                    <div class="value"><em style="color:var(--text-dim)">Будет добавлено</em></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="page-section">
+            <h3>Обратная связь</h3>
+            <p class="placeholder-note">Здесь можно добавить форму обратной связи или дополнительные контактные данные.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile Tab Bar -->
+<div id="mobile-tabs">
+    <button class="mob-tab" data-panel="sidebar">
+        <span class="mob-icon">☰</span>
+        <span>Список</span>
+    </button>
+    <button class="mob-tab active" data-panel="center">
+        <span class="mob-icon">✦</span>
+        <span>Описание</span>
+    </button>
+    <button class="mob-tab" data-panel="right">
+        <span class="mob-icon">◎</span>
+        <span>Карта</span>
+    </button>
+</div>
+
+<div id="credit">Сайт: Антон Лейманн &nbsp;·&nbsp; Текст и идея: Арина Завьялова</div>
+
 <script>
-// --- Инициализация карты ---
-const map = L.map('map', { closePopupOnClick: false }).setView([61.5, 33.5], 6.5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
-
-// --- Точки маршрута с изображениями ---
-const points = [
-{    
-id:1,
-name:'Санкт-Петербург',
-lat:59.9343, lon:30.3351,
-image:'images/photo_1_2026-01-09_02-00-40.jpg',
-desc:`
-<p><i>Крепость Шлиссельбург, «Орешек»</i></p>
-<p><strong>Историческая справка</strong><br>
-Город Санкт-Петербург был основан в 1703 году по указу Петра I. С 1712 по 1918 год являлся столицей Российской империи.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Санкт-Петербург выступает как точка отсчёта и контраст. Отсюда начинается путешествие повествователя из мира цивилизации, порядка и европейской культуры в «дикий», первозданный и архаичный мир Русского Севера (Олонецкой губернии). Это отправная географическая и смысловая точка маршрута.</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Вот где, кажется, и вспомнить о делах Петра и вообще подумать над судьбой родины: крепость, построенная новгородцами и названная ими Орешек, перешла потом к шведам и стала называться Нотебург. В 1702 году, после знаменитого сражения, крепость достается снова русским и называется Шлиссельбург – ключ, которым, по словам Петра, были открыты двери в Европу.»</p>
-`
-},
-{
-id:2,
-name:'Ладожское озеро',
-lat:60.85, lon:31.50,
-image:'images/photo_22_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Крупнейшее пресноводное озеро Европы (площадь около 18 135 км²). Расположено на северо-западе России, на территории Республики Карелия и Ленинградской области. В озеро впадают десятки рек (крупнейшая – Свирь), а вытекает только одна – река Нева, на которой стоит Санкт-Петербург.
-Озеро известно своими штормами и коварной погодой, что исторически делало его сложным для навигации. Берега на севере – скалистые, изрезанные шхерами, на юге – пологие и болотистые.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Ладожское озеро является ключевым географическим рубежом на пути М. Пришвина. В начале произведения («От Петербурга до Повенца») путешественник следует водным путём из Петербурга. Чтобы попасть из Санкт-Петербурга в уездный город Повенец на Онежском озере, необходимо было пересечь Ладожское озеро с юга на север (через него проходил Мариинский водный путь).
-Для Пришвина Ладога – это не просто водная гладь, а природная граница. Пересечение озера символизирует окончательный переход из знакомого, цивилизованного мира (Петербург) в «край непуганых птиц» – дикий, первозданный и загадочный мир Олонецкого края с его дремучими лесами, старообрядческими скитами и архаичным укладом жизни. Его суровая стихия задаёт тон всему дальнейшему путешествию.</p>
-`
-},
-{
-id:3,
-name:'Река Свирь',
-lat:60.9115, lon:34.0792,
-desc:`
-<p><strong>Историческая справка</strong><br>
-Река Свирь – единственная река, вытекающая из Онежского озера и впадающая в Ладожское озеро. Является важнейшей частью Мариинской водной системы (предшественницы Волго-Балтийского пути). Длина реки 224 км. Река имеет спокойное течение на плёсовых участках и знаменита своими порогами, которые исторически затрудняли судоходство.
-По берегам реки с древности селились прибалтийско-финские племена (вепсы), что отражено в названии (от вепсского Šüvär – «глубокая»). В более поздний период регион стал ареной русско-шведских конфликтов.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Река Свирь играет в маршруте повествователя ключевую транспортную и символическую роль. После пересечения Ладожского озера путешественник поднимался вверх по реке Свирь, чтобы попасть из бассейна Ладоги в бассейн Онежского озера, к своей цели – городу Повенец и далее в глубину Олонецкого края.
-Для Пришвина Свирь – это не просто водный путь, а «коридор» между двумя мирами. Если Ладожское озеро – это великая и суровая граница, то Свирь – это путь вглубь «края непуганых птиц». Её течение проводит героя из одного географического и смыслового пространства в другое. В её порогах и берегах уже чувствуется дыхание той самой дикой, дремучей природы и иной, уходящей в прошлое жизни, которую ищет автор.</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Река Свирь – прежде всего место для перевозки леса, муки. Она есть одно из тех устьев Мариинской водной системы, которая соединяет Петербург с Поволжьем.»</p>
-`
-},
-{
-id:4,
-name:'Онежское озеро',
-lat:61.70, lon:35.00,
-image:'images/photo_25_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Второе по величине озеро в Европе после Ладожского (площадь – 9 720 км²). Одно из самых чистых и глубоких крупных озёр материка. Расположено на северо-западе России, большей частью в Республике Карелия. Имеет сложную форму с многочисленными заливами («губами») и более 1 650 островов, самый знаменитый из которых – Кижи. Принимает около 50 рек, а вытекает только одна – река Свирь, которая несёт воды в Ладожское озеро. Знаменито своими «онежскими шхерами» – скалистыми лесистыми островами на севере.
-Сегодня Онежское озеро – объект всемирного культурного наследия (Кижи), важный туристический маршрут и по-прежнему – символ природного и культурного богатства Русского Севера.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Онежское озеро является географическим и смысловым центром всего произведения, тем самым «краем», куда стремился автор. Вся экспедиция Пришвина разворачивается в бассейне Онежского озера. Уездный город Повенец, куда автор прибывает в начале, стоит на его берегах. Отсюда расходятся пути вглубь Заонежья, Поморья и лесной глуши, где живут ловцы, полесники и скрытники. Масштаб озера, первозданная природа, изменчивая погода и труднодоступные берега создают среду, в которой сохранился древний уклад жизни, фольклор и духовные традиции (старообрядчество).
-Берега Онежского озера – один из центров русского эпического фольклора (былин) и деревянного зодчества (Кижи). Именно здесь Пришвин встречает «певца былин» и погружается в мир древних сказаний.</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Редко бывает совершенно спокойно бурное Онежское озеро. Но случилось так, что, когда мы ехали, не было ни малейшей зыби. Оно было необыкновенно красиво. Большие пышные облака гляделись в спокойную чистую воду или ложились фиолетовыми тенями на волнистые темно-зеленые берега. Острова словно поднимались над водой и висели в воздухе, как это кажется здесь в очень тихую теплую погоду.»</p>
-`
-},
-{
-id:5,
-name:'Климентский остров',
-lat:61.9555, lon:35.256028,
-image:'images/photo_19_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Остров находится в Кижских шхерах Онежского озера, примерно в 20 км к северо-западу от острова Кижи. С конца XV века остров известен как место основания Клименецкого (Свято-Троицкого) монастыря – одного из старейших на Русском Севере. К началу XX века монастырь утратил былое влияние, но его история и само место оставались значимыми в памяти местных жителей. Остров служил одним из географических и духовных ориентиров в системе навигации и в религиозной жизни Заонежья.
-Сегодня на Климентском острове сохранились лишь остатки монастырских построек. Он, как и во времена Пришвина, остаётся немым свидетелем истории, притягивая немногочисленных путешественников и паломников своей суровой, уединённой атмосферой.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Климентский (Клименецкий) остров упоминается в главе «Выговская пустынь». Он не является точкой остановки на пути повествователя, но выступает важным символическим ориентиром в духовном ландшафте края.
-Для героев книги (старообрядцев-выговцев) Клименецкий монастырь олицетворяет официальную, «никонианскую» церковь, от которой они ушли в раскол. Упоминание острова создаёт историко-религиозный контекст, на фоне которого понятнее драма и самоопределение старообрядческих общин.
-В повествовании Пришвина остров входит в число сакральных точек Онежского озера наряду с Выговской пустынью, Кижами и другими скитами. Он часть духовного архипелага, где на протяжении веков шла борьба за сохранение веры. Вероятно, остров был виден с воды во время передвижения автора по Онежскому озеру. Его упоминание – это штрих к точному географическому описанию пути, погружающий читателя в конкретику онежских просторов.</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Покосившийся крест в воде на том месте, где разбились суда, масса камней, каменная церковь, деревянная, две-три постройки и на фоне хвойный лес. Церкви по виду самые обыкновенные: деревянная выстроена недавно, каменная сохранилась с основания монастыря.»
-</p>
-`
-},
-{
-id:6,
-name:'Петрозаводск',
-lat:61.7833, lon:34.3500,
-image:'images/photo_2026-01-09_02-04-26.jpg',
-desc:`
-<p><i>Общественная пристань в Петрозаводске. Художник В. С. Пармаков</i></p>
-<p><strong>Историческая справка</strong><br>
-Город был основан в 1703 году (в один год с Санкт-Петербургом) как поселение при Петровском оружейном заводе. С 1801 года является административным центром Олонецкой губернии, а сегодня – столица Республики Карелия. Расположен на западном берегу Онежского озера, в устье реки Лососинки. На протяжении веков Петрозаводск был главным промышленным, культурным и транспортным узлом региона. 
-Сегодня Петрозаводск – крупнейший город Карелии, научный и культурный центр, популярная отправная точка для туристов, путешествующих по Онежскому краю и на остров Кижи.
-</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Петрозаводск является важным смысловым фоном и контрастом в книге, но при этом отсутствует как точка маршрута повествователя. Петрозаводск – олицетворение государственного, «петровского» порядка, цивилизации и промышленного освоения края. Путешественник следует из Петербурга через Ладогу и Свирь напрямую в уездный Повенец и далее вглубь Заонежья, минуя губернскую столицу. Этот сознательный выбор маршрута подчёркивает цель автора – уйти от «официальной» России к её древней, «непуганой» сердцевине.</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Помню, когда я гулял в Петрозаводске в ожидании парохода, мне почему-то казалось, что чистенький городок не живет, а тихо дремлет. Я не хочу этим словом обидеть городок; он дремлет не так, как наши провинциальные города центра, а как-то по-своему. В нем всегда тихо, и было бы нехорошо, если бы на берегу такого красивого озера, между холмами, что-нибудь сгущенное, человеческое шумело и коптело. Городок дремлет в тишине, и только время от времени что-то тяжело звякнет, стукнет или загудит снизу из котловинки в средине города.»</p>
-`
-},
-{
-id:7,
-name:'Повенец',
-lat:62.849667950, lon:34.825558694,
-image:'images/photo_2_2026-01-09_02-00-40.jpg',
-desc:`
-<p><i>Повенец. Фото М.Ю.Кашина, 2018 год</i></p>
-<p><strong>В начале XX века</strong><br>
-В начале XX века – уездный город Олонецкой губернии. Название происходит от древнерусского слова повенец – «пристань, место стоянки судов». Расположен на западном берегу Онежского озера, у истока Беломорско-Балтийского канала (во времена Пришвина – у начала Мариинской водной системы). Ключевой транспортный узел на пути из центра России в Поморье. 
-После публикации книги Пришвина судьба Повенца сложилась драматично. В 1930-х годах при строительстве Беломорско-Балтийского канала (район считался «воротами» в новую стройку) старый город был практически полностью разрушен и затоплен. Сегодня это посёлок городского типа, стоящий на новом месте, – молчаливый памятник истории, описанной Пришвиным.
-</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Повенец – одна из важнейших конкретных точек на карте путешествия, имеющая ключевую сюжетную и символическую роль. Это последний оплот «официальной» России и цивилизации. В главе «Вступление. От Петербурга до Повенца» город является порогом, за которым начинается тот самый «край непуганых птиц».
-Здесь заканчивается относительно комфортное путешествие по водным системам и начинается настоящее погружение в глушь. Из Повенца пути расходятся вглубь Заонежья и Поморья. В повенцецкой пристани и окрестных деревнях автор делает свои первые наблюдения за местным укладом жизни, который резко контрастирует со столичным.
-Городок олицетворяет собой границу двух миров: имперского, государственного порядка (отсюда шло управление уездом) и стихийного, архаичного уклада Русского Севера. Он служит отправной точкой для всех последующих глав-встреч (с ловцами, вопленицей, полесниками, скрытниками).</p>
-
-<p><strong>Цитата из сборника:</strong><br>
-«Про Повенец говорят обыкновенно: он всему миру конец. Но, как я уже говорил, для меня с Повенца только и начинался самый любопытный мир.»</p>
-`
-},
-{
-id:8,
-name:'Выговский край',
-lat:63.398536, lon:34.706143,
-image:'images/photo_4_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Историческая область в восточном Прионежье, бассейн реки Выг и Выг-озера. Это не административная единица, а культурно-исторический феномен. В конце XVII – начале XVIII века этот глухой лесной край стал главным духовным и административным центром русского старообрядчества – Выговским общежительством (или Выговской пустынью). Здесь сложилась уникальная общность, сочетавшая строгую веру, хозяйственную самостоятельность (железоделательные промыслы, торговля, иконопись) и высокую книжную культуру.
-Выговский край сегодня – это территория с богатым историческим наследием (сохранились памятники и кладбища скитов), привлекающая исследователей и туристов, следующих по маршрутам старообрядцев.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Глава «Выговская пустынь» – смысловая кульминация путешествия. «Выговский край» для автора – это олицетворение «иной», сокрытой России, ушедшей в леса от государственной власти и церковных реформ, чтобы сохранить свою веру и древний уклад. Это «край непуганых птиц» в его человеческом измерении.</p>
-
-<p><strong>Цитата из сборника:</strong><br> 
-«Название "Выговский край" не существует в географии. Он входит в общее название "Поморья". Но он своеобразен во всех отношениях и достоин отдельного названия. Он занимает всю ту местность, которая прилегает к берегам Выг-озера, впадающего в него с юго-запада Верхнего (южного) Выга и вытекающего из северного конца озера Нижнего (северного) Выга.»</p>
-`
-},
-{
-id:9,
-name:'Выг-озеро',
-lat:63.560911, lon:34.701396,
-image:'images/photo_16_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Крупное озеро в Карелии, через которое протекает река Нижний Выг. Являлось природным ядром и важной транспортной артерией Выговского общежительства.
-Выг-озеро сильно изменилось в середине XX века: после создания каскада ГЭС и Беломорско-Балтийского канала его уровень поднялся более чем на 6 метров, оно стало частью Выгозерского водохранилища.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-Озеро выступает как важный символ и ориентир. Путь к духовному центру старообрядцев лежит через это озеро. Его воды, берега и весь окружающий ландшафт несут на себе отпечаток истории выговцев. Это географическая основа того культурного пространства, которое исследует Пришвин.
-Путь Пришвина логически ведёт от общего описания природы («Лес, вода и камень») через встречи с отдельными носителями северной культуры (вопленица, певец былин) к точке их духовного и исторического сосредоточения – Выговскому краю. Это путешествие от внешних примет «непуганости» к её внутреннему источнику.</p>
-
-<p><strong>Цитата из сборника:</strong><br>  «Вероятно, многие из необитаемых теперь Выг-озерских островов были когда-то заселены. Иногда увидишь врубленный в дерево восьмиконечный староверский крест, иногда попадаются сложенные в кучи, очевидно рукою человека, камни. Местные люди здесь находят котелки, монеты, стрелы. Есть много поверий о зарытых в них кладах. Острова кажутся могилами.»</p>
-`
-},
-{
-id:10,
-name:'Надвоицы',
-lat:63.8886, lon:34.2569,
-image:'images/photo_12_2026-01-08_22-03-54.jpg',
-desc:`
-<p><i>Первое издание книги «В краю непуганых птиц», 1907 г.</i></p>
-<p><strong>Историческая справка</strong><br>
-Рабочий посёлок и важная пристань на реке Нижний Выг, примерно в 25 км от её впадения в Выг-озеро. Название связано с географией: поселение располагалось у порога Воица на реке Выг («над Воицей»). Порог был серьёзным препятствием для судоходства.
-К началу XX века Надвоицы уже были известны как центр лесозаготовок и лесосплава, а также как пункт, связанный с месторождениями озёрной железной руды. В 1950-х годах, уже после жизни Пришвина, судьба Надвоиц резко изменилась. Здесь был построен мощный Надвоицкий алюминиевый завод, а сам посёлок превратился в современный промышленный город Севороникель.</p>
-
-<p><strong>Роль в сборнике очерков «В краю непуганых птиц»</strong><br>
-В книге Пришвина Надвоицы упоминаются в главе «Выговская пустынь» как значимый ориентир на пути к главной цели – Выговскому старообрядческому общежительству. Надвоицы служили для путешественника одним из последних «цивилизованных» перевалочных пунктов перед погружением в глухие, малонаселённые земли, где располагались скиты. Это место, где водный путь прерывался порогом, требовал пересадки или особой осторожности, символизируя труднодоступность искомого «края».
-Упоминание Надвоиц как рабочего посёлка и пристани создаёт важный контраст. Автор движется из мира промышленной активности (лесоповал, сплав) в мир духовного уединения и древней веры (Выговская пустынь). Это подчёркивает, что «край непуганых птиц» – не просто географическая глушь, а сознательно выбранное убежище от наступающего нового мира.</p>
-
-<p><strong>Цитата из сборника:</strong><br> «Надвоицы – селение на Выгу, почти у самых Воицких водопадов.», «Выг у селения Надвоицы еще не имеет вида обыкновенной горной, бурливой реки. Однако все-таки вода довольно сильно стремится куда-то, всюду всплескивает о камни, беспокоится, всюду виднеются вьюны, лодкой нужно только управлять. Впереди, посредине реки, виднеется кучка елей, с виду как раз такой же островок, как на Выг-озере.»</p>
-`
+/* ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ */
+function setActivePage(pageId) {
+    document.querySelectorAll('nav a, .nav-dropdown a').forEach(a => {
+        a.classList.toggle('active', a.dataset.page === pageId);
+    });
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + pageId).classList.add('active');
+    if (pageId === 'route' && map) setTimeout(() => map.resize(), 50);
 }
-];
 
-// --- Popup настройки ---
-const descriptionPopup = L.popup({
-    closeButton: true,
-    autoClose: true,
-    autoPan: false
-});
-
-const markers = [];
-const group = L.featureGroup().addTo(map);
-
-// --- Добавление маркеров ---
-points.forEach(pt => {
-    const m = L.marker([pt.lat, pt.lon]).addTo(map);
-    m._pt = pt;
-    markers.push(m);
-    group.addLayer(m);
-
-    m.on('mouseover', function() {
-    const imgHTML = pt.image
-      ? `<img src="${pt.image}" style="max-width:100%;height:auto;margin:8px 0;">`
-      : '';
-
-    descriptionPopup
-        .setLatLng(m.getLatLng())
-        .setContent(`
-            <h3>${pt.name}</h3>
-            ${imgHTML}
-            ${pt.desc}
-        `);
-
-        descriptionPopup.options.maxHeight = window.innerHeight * 0.45;
-        descriptionPopup.options.minHeight = window.innerHeight * 0.45;
-        descriptionPopup.options.maxWidth = window.innerWidth * 0.2;
-        descriptionPopup.options.minWidth = window.innerWidth * 0.2;
-
-        descriptionPopup.openOn(map);
+document.querySelectorAll('nav a, .nav-dropdown a').forEach(link => {
+    link.addEventListener('click', e => {
+        e.preventDefault();
+        setActivePage(link.dataset.page);
+        closeDropdown();
     });
 });
 
+// Burger menu
+const burger = document.getElementById('nav-burger');
+const dropdown = document.getElementById('nav-dropdown');
+const overlay = document.getElementById('nav-overlay');
+
+function closeDropdown() {
+    dropdown.classList.remove('open');
+    overlay.classList.remove('open');
+}
+burger.addEventListener('click', () => {
+    const isOpen = dropdown.classList.contains('open');
+    dropdown.classList.toggle('open', !isOpen);
+    overlay.classList.toggle('open', !isOpen);
+});
+overlay.addEventListener('click', closeDropdown);
+
+/* ══════════════════════════════════════════
+   MOBILE TABS
+══════════════════════════════════════════ */
+const MOBILE_PANELS = ['sidebar', 'center', 'right'];
+
+function setMobilePanel(panelId) {
+    MOBILE_PANELS.forEach(id => {
+        document.getElementById(id).classList.toggle('mob-active', id === panelId);
+    });
+    document.querySelectorAll('.mob-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.panel === panelId);
+    });
+    if (panelId === 'right' && map) setTimeout(() => map.resize(), 80);
+}
+
+document.querySelectorAll('.mob-tab').forEach(tab => {
+    tab.addEventListener('click', () => setMobilePanel(tab.dataset.panel));
+});
+
+// Init mobile state
+function initMobilePanels() {
+    if (window.innerWidth <= 768) {
+        setMobilePanel('center');
+    }
+}
+initMobilePanels();
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 768) {
+        MOBILE_PANELS.forEach(id => document.getElementById(id).classList.remove('mob-active'));
+    } else {
+        const anyActive = MOBILE_PANELS.some(id => document.getElementById(id).classList.contains('mob-active'));
+        if (!anyActive) setMobilePanel('center');
+    }
+});
+
+/* ══════════════════════════════════════════
+   ROUTE DATA
+══════════════════════════════════════════ */
+const points = [
+{
+    id:1, name:'Санкт-Петербург', lat:59.9343, lon:30.3351,
+    images:[{ src:'images/photo_1_2026-01-09_02-00-40.jpg', caption:'Крепость Шлиссельбург («Орешек»)' }],
+    geo:`Санкт-Петербург расположен в устье реки Невы, на берегах Финского залива Балтийского моря. Город раскинулся на 42 островах, разделённых реками и каналами невской дельты. Площадь — около 1 439 км². Климат умеренно континентальный, с сырыми зимами и знаменитыми белыми ночами.`,
+    history:`Основан в 1703 году по указу Петра I как форпост на завоёванных шведских землях. С 1712 по 1918 год — столица Российской империи. К началу XX века — крупнейший промышленный и культурный центр страны с населением более 1,9 миллиона человек.`,
+    role:`Санкт-Петербург — точка отсчёта и контраст всему последующему путешествию. Отсюда начинается переход из мира цивилизации и европейской культуры в «дикий», первозданный мир Русского Севера.`,
+    quote:`«Вот где, кажется, и вспомнить о делах Петра и вообще подумать над судьбой родины: крепость, построенная новгородцами и названная ими Орешек, перешла потом к шведам и стала называться Нотебург. В 1702 году, после знаменитого сражения, крепость достается снова русским и называется Шлиссельбург — ключ, которым, по словам Петра, были открыты двери в Европу.»`
+},
+{
+    id:2, name:'Ладожское озеро', lat:60.85, lon:31.50,
+    images:[{ src:'images/photo_22_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Крупнейшее пресноводное озеро Европы: площадь около 18 135 км², глубина до 230 м. Расположено на стыке Республики Карелия и Ленинградской области. В озеро впадают десятки рек, вытекает единственная — Нева. Северные берега скалистые, изрезанные шхерами; южные — пологие.`,
+    history:`Озеро исстари входило в важнейшие торговые пути — «из варяг в греки». Отличается коварными штормами: ладожские волны короткие и крутые. На протяжении столетий берега были ареной русско-шведских войн за выход к Балтике.`,
+    role:`Ключевой географический рубеж на пути Пришвина. Пересечение озера с юга на север символизирует переход из цивилизованного мира в «край непуганых птиц». Суровая стихия задаёт тон всему дальнейшему путешествию.`,
+    quote:``
+},
+{
+    id:3, name:'Река Свирь', lat:60.9115, lon:34.0792,
+    images:[],
+    geo:`Единственная река, вытекающая из Онежского озера и впадающая в Ладожское. Длина 224 км. Течение спокойное на плёсах и ускоренное на порожистых участках. По берегам с древности селились прибалтийско-финские племена вепсов.`,
+    history:`Важнейшая часть Мариинской водной системы, соединявшей Петербург с Поволжьем. Пороги реки исторически затрудняли судоходство. Здесь проходила граница между Олонецкой губернией и остальной Россией.`,
+    role:`Свирь — «коридор» между двумя мирами. Если Ладога — великая граница, то Свирь — путь вглубь «края непуганых птиц». В её берегах уже чувствуется дыхание дикой северной природы и иной, уходящей в прошлое жизни.`,
+    quote:`«Река Свирь — прежде всего место для перевозки леса, муки. Она есть одно из тех устьев Мариинской водной системы, которая соединяет Петербург с Поволжьем.»`
+},
+{
+    id:4, name:'Онежское озеро', lat:61.70, lon:35.00,
+    images:[{ src:'images/photo_25_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Второе по величине озеро в Европе: площадь 9 720 км², глубина до 127 м. Расположено преимущественно в Республике Карелия. Имеет сложную форму с множеством заливов и более 1 650 островов. Вытекает единственная река — Свирь.`,
+    history:`Один из центров русского эпического фольклора (былин) и деревянного зодчества. Остров Кижи с ансамблем деревянных церквей сегодня — объект всемирного наследия ЮНЕСКО. Берега озера издревле заселены карелами и вепсами.`,
+    role:`Географический и смысловой центр всего произведения. Вся экспедиция Пришвина разворачивается в бассейне Онежского озера. Именно здесь он встречает певца былин и погружается в мир древних сказаний.`,
+    quote:`«Редко бывает совершенно спокойно бурное Онежское озеро. Но случилось так, что, когда мы ехали, не было ни малейшей зыби. Оно было необыкновенно красиво. Большие пышные облака гляделись в спокойную чистую воду...»`
+},
+{
+    id:5, name:'Климентский остров', lat:61.9555, lon:35.2560,
+    images:[{ src:'images/photo_19_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Небольшой остров в Кижских шхерах Онежского озера, примерно в 20 км к северо-западу от Кижей. Окружён скалистыми берегами, покрытыми хвойным лесом. Труднодоступность острова определила его судьбу как места монастырского уединения.`,
+    history:`С конца XV века — место Клименецкого (Свято-Троицкого) монастыря, одного из старейших на Русском Севере. К началу XX века монастырь утратил прежнее значение. Сегодня от построек остались лишь руины.`,
+    role:`Упоминается в главе «Выговская пустынь». Для старообрядцев монастырь олицетворяет официальную «никонианскую» церковь, от которой они ушли в раскол. Остров — часть духовного архипелага Онежского озера.`,
+    quote:`«Покосившийся крест в воде на том месте, где разбились суда, масса камней, каменная церковь, деревянная, две-три постройки и на фоне хвойный лес.»`
+},
+{
+    id:6, name:'Петрозаводск', lat:61.7833, lon:34.3500,
+    images:[{ src:'images/photo_2026-01-09_02-04-26.jpg', caption:'Общественная пристань в Петрозаводске. Художник В. С. Пармаков' }],
+    geo:`Расположен на западном берегу Онежского озера, в устье реки Лососинки. Холмистая местность, спускающаяся террасами к озеру. Климат умеренно континентальный. Сегодня — столица Республики Карелия.`,
+    history:`Основан в 1703 году при Петровском пушечном заводе. С 1801 года — административный центр Олонецкой губернии. На протяжении XIX века оставался главным промышленным и культурным узлом всего края.`,
+    role:`Олицетворение государственного, «петровского» порядка. Пришвин сознательно минует губернскую столицу, устремляясь к «непуганой» сердцевине края — уйти от официальной России к её архаичной первооснове.`,
+    quote:`«Помню, когда я гулял в Петрозаводске в ожидании парохода, мне почему-то казалось, что чистенький городок не живёт, а тихо дремлет. Он дремлет в тишине, и только время от времени что-то тяжело звякнет, стукнет или загудит снизу.»`
+},
+{
+    id:7, name:'Повенец', lat:62.8497, lon:34.8256,
+    images:[{ src:'images/photo_2_2026-01-09_02-00-40.jpg', caption:'Повенец. Фото М.Ю.Кашина, 2018 год' }],
+    geo:`Расположен на западном берегу Онежского озера. В начале XX века — небольшой уездный город с деревянной застройкой. В 1930-х годах при строительстве Беломорско-Балтийского канала старый город был затоплен.`,
+    history:`Название от древнерусского «повенец» — пристань. Исторически важный транспортный узел у начала Мариинской водной системы. После затопления отстроен заново. Сегодня — посёлок городского типа.`,
+    role:`Последний оплот цивилизации — порог, за которым начинается «край непуганых птиц». Здесь заканчивается комфортное путешествие по водным системам и начинается погружение в глушь Олонецкого края.`,
+    quote:`«Про Повенец говорят обыкновенно: он всему миру конец. Но, как я уже говорил, для меня с Повенца только и начинался самый любопытный мир.»`
+},
+{
+    id:8, name:'Выг-озеро', lat:63.5609, lon:34.7014,
+    images:[{ src:'images/photo_16_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Крупное озеро в центральной Карелии, через которое протекает река Нижний Выг. Берега преимущественно низкие, с многочисленными островами. После строительства каскада ГЭС в XX веке стало частью Выгозерского водохранилища.`,
+    history:`Природное ядро и транспортная артерия Выговского старообрядческого общежительства. Острова служили местами для скитов и пустынножительства. Многие из них ныне скрыты под водой.`,
+    role:`Путь к духовному центру старообрядцев лежит через это озеро. Его берега несут отпечаток истории выговцев. Острова кажутся автору могилами ушедшей жизни — безмолвными свидетелями угасшей общины.`,
+    quote:`«Вероятно, многие из необитаемых теперь Выг-озерских островов были когда-то заселены. Иногда увидишь врубленный в дерево восьмиконечный староверский крест. Острова кажутся могилами.»`
+},
+{
+    id:9, name:'Надвоицы', lat:63.8886, lon:34.2569,
+    images:[{ src:'images/photo_12_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Рабочий посёлок на реке Нижний Выг, примерно в 25 км от её впадения в Выг-озеро. Название связано с порогом Воица — «над Воицей». Порог создавал труднопроходимый участок с сильным течением и перепадом высот.`,
+    history:`К началу XX века — центр лесозаготовок, лесосплава и озёрной железной руды. В 1950-х годах здесь построен Надвоицкий алюминиевый завод, превративший посёлок в промышленный центр.`,
+    role:`Один из последних «цивилизованных» пунктов перед погружением в земли скитов. Упоминание Надвоиц создаёт контраст: автор движется из мира промышленной активности в мир духовного уединения.`,
+    quote:`«Надвоицы — селение на Выгу, почти у самых Воицких водопадов. Выг у селения Надвоицы ещё не имеет вида обыкновенной горной, бурливой реки. Однако всё-таки вода довольно сильно стремится куда-то, всюду всплескивает о камни, беспокоится.»`
+},
+{
+    id:10, name:'Еловый островок', lat:63.909438, lon:34.266994,
+    images:[],
+    geo:`Небольшой остров на Выг-озере, поросший вековыми елями. Подобные островки, сплошь покрытые тёмным хвойным лесом, типичны для этих мест. Суровый облик острова в сочетании с тишиной карельских вод производил неизгладимое впечатление на путешественников.`,
+    history:`Острова на Выг-озере исстари служили ориентирами для лодочников и местами временных стоянок. Еловые островки особенно ценились старообрядцами как места для уединённой молитвы — вдали от людских глаз.`,
+    role:`Образ Елового островка воплощает ту самую «непуганость» северной природы, которую ищет автор. Дикий, нетронутый островок среди безмолвных вод — концентрат атмосферы всей книги.`,
+    quote:``
+},
+{
+    id:11, name:'Надвоицкое озеро', lat:63.901519, lon:34.278372,
+    images:[],
+    geo:`Небольшое лесное озеро в окрестностях Надвоиц, связанное с системой рек и протоков бассейна Нижнего Выга. Берега поросли густым смешанным лесом; вода отличается особой прозрачностью, характерной для карельских озёр.`,
+    history:`Озеро входило в сеть водных путей, которыми пользовались старообрядцы для перемещения между скитами. Окрестные леса в XVII–XVIII веках служили убежищем для бежавших от преследований раскольников.`,
+    role:`Упоминается как один из водных ориентиров на пути к старообрядческим поселениям. Безлюдный берег озера символизирует ту первозданную тишину, которую ищет повествователь в своём путешествии.`,
+    quote:``
+},
+{
+    id:12, name:'Корельский остров', lat:63.592481, lon:34.869761,
+    images:[],
+    geo:`Остров на Выг-озере с пологими, частично заболоченными берегами. Название указывает на связь с карельским (корельским) населением, осваивавшим эти земли с глубокой древности. Остров хорошо виден с основных лодочных маршрутов по озеру.`,
+    history:`Карельские острова на Выг-озере были заселены задолго до прихода старообрядцев. Впоследствии часть из них стала местами скитов и отшельнических поселений Выговского общежительства.`,
+    role:`Упоминается в контексте описания Выг-озера и его островов. Для Пришвина острова озера — это слои истории, где древнекарельская жизнь перемешалась со старообрядческой традицией.`,
+    quote:``
+},
+{
+    id:13, name:'Выговская пустынь', lat:63.131725,  lon:35.530410,
+    images:[{ src:'images/photo_4_2026-01-08_22-03-54.jpg', caption:'Первое издание книги «В краю непуганых птиц», 1907 г.' }],
+    geo:`Историческое место в лесах восточного Прионежья, бассейн реки Верхний Выг. Труднодоступность — густые леса, болота, отсутствие дорог — делала эти места идеальным убежищем для старообрядцев, искавших уединения от государства и официальной церкви.`,
+    history:`В конце XVII — начале XVIII века здесь возникло Выговское старообрядческое общежительство, ставшее духовной и административной столицей русского беспоповского старообрядчества. На пике расцвета здесь жило несколько тысяч человек. В 1855 году общежительство было разгромлено властями.`,
+    role:`Смысловая кульминация путешествия. Выговская пустынь — олицетворение «иной», сокрытой России, ушедшей в леса от государственной власти. Это «край непуганых птиц» в его человеческом, духовном измерении.`,
+    quote:`«Название "Выговский край" не существует в географии. Он входит в общее название "Поморья". Но он своеобразен во всех отношениях и достоин отдельного названия.»`
+},
+{
+    id:14, name:'Данилов', lat:62.9653, lon:35.7025,
+    images:[],
+    geo:`Деревня на реке Верхний Выг в южной части Выговского края. Расположена в низине среди лесов и болот. В начале XX века — небольшое поселение, сохранявшее память о некогда великом старообрядческом центре, стоявшем в этих местах.`,
+    history:`Данилово — бывший центр Выговского общежительства, названный в честь его основателя Даниила Викулина. Здесь располагались главные здания пустыни: часовни, библиотека, иконописные мастерские. После разгрома 1855 года постепенно пришёл в упадок.`,
+    role:`Данилов олицетворяет трагическую судьбу Выговского общежительства. Посещение этих мест для Пришвина — встреча с живой памятью о народной духовности, подавленной государством, но не исчезнувшей бесследно.`,
+    quote:``
+},
+{
+    id:15, name:'Пулозеро', lat:63.7583, lon:35.4133,
+    images:[],
+    geo:`Небольшое лесное озеро в северной части Выговского края. Окружено густым хвойным лесом. Один из самых отдалённых и труднодоступных водоёмов в маршруте Пришвина, подлинная глушь Олонецкого края.`,
+    history:`Окрестности Пулозера в XVII–XVIII веках входили во владения Выговского общежительства. В этих краях находились дальние скиты отшельников, искавших максимального уединения даже внутри самой пустыни.`,
+    role:`Пулозеро — крайняя точка маршрута, символ предельной «непуганости». Здесь природа и тишина достигают абсолюта. Этот водоём воплощает ту самую дикую, первозданную Россию, ради встречи с которой Пришвин предпринял всё своё путешествие.`,
+    quote:``
+}
+];
+
+/* Слияние маркеров по расстоянию на экране: при отдалении слипаются, при приближении расходятся.
+   Порог — расстояние между центрами в пикселях; меньше = только при реальном наложении кругов (~2× радиус). */
+const MAP_CLUSTER_PX = 28;
+
+function clusterPointIndicesByPixel(pts, map, mergePx = MAP_CLUSTER_PX) {
+    const n = pts.length;
+    if (!map || n === 0) return pts.map((_, i) => [i]);
+    const projected = pts.map(p => map.project([p.lon, p.lat]));
+    const parent = Array.from({ length: n }, (_, i) => i);
+    function find(i) {
+        if (parent[i] !== i) parent[i] = find(parent[i]);
+        return parent[i];
+    }
+    function union(a, b) {
+        const ra = find(a);
+        const rb = find(b);
+        if (ra !== rb) parent[ra] = rb;
+    }
+    const r2 = mergePx * mergePx;
+    for (let a = 0; a < n; a++) {
+        for (let b = a + 1; b < n; b++) {
+            const dx = projected[a].x - projected[b].x;
+            const dy = projected[a].y - projected[b].y;
+            if (dx * dx + dy * dy <= r2) union(a, b);
+        }
+    }
+    const byRoot = new Map();
+    for (let i = 0; i < n; i++) {
+        const r = find(i);
+        if (!byRoot.has(r)) byRoot.set(r, []);
+        byRoot.get(r).push(i);
+    }
+    return [...byRoot.values()];
+}
+
+function formatClusterLabel(sortedIds) {
+    const n = sortedIds.length;
+    if (n === 1) return String(sortedIds[0]);
+    const min = sortedIds[0];
+    const max = sortedIds[n - 1];
+    const consecutive = sortedIds.every((v, i) => v === min + i);
+    if (consecutive) return `${min}–${max}`;
+    return sortedIds.join('·');
+}
+
+function buildRoutePointsGeoJSON(pts, selectedId, groups) {
+    const features = [];
+    for (const indices of groups) {
+        const ps = indices.map(i => pts[i]).sort((a, b) => a.id - b.id);
+        const ids = ps.map(p => p.id);
+        if (ids.length === 1) {
+            const p = ps[0];
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+                properties: {
+                    kind: 'single',
+                    id: p.id,
+                    label: String(p.id),
+                    selected: selectedId != null && selectedId === p.id ? 1 : 0
+                }
+            });
+        } else {
+            let sumX = 0;
+            let sumY = 0;
+            ps.forEach(p => {
+                sumX += p.lon;
+                sumY += p.lat;
+            });
+            const cLon = sumX / ps.length;
+            const cLat = sumY / ps.length;
+            features.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [cLon, cLat] },
+                properties: {
+                    kind: 'cluster',
+                    label: formatClusterLabel(ids),
+                    ids: ids.join(','),
+                    pickId: ids[0],
+                    selected: selectedId != null && ids.includes(selectedId) ? 1 : 0
+                }
+            });
+        }
+    }
+    return { type: 'FeatureCollection', features };
+}
+
+/* ══════════════════════════════════════════
+   MAP
+══════════════════════════════════════════ */
+const map = new maplibregl.Map({
+    container: 'map',
+    style: {
+        version: 8,
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        sources: {
+            carto: {
+                type: 'raster',
+                tiles: [
+                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                ],
+                tileSize: 256,
+                attribution: '&copy; OpenStreetMap contributors'
+            }
+        },
+        layers: [{
+            id: 'base', type: 'raster', source: 'carto',
+            paint: {
+                'raster-saturation': -0.45,
+                'raster-brightness-max': 0.82,
+                'raster-contrast': 0.08,
+                'raster-hue-rotate': 18
+            }
+        }]
+    },
+    center: [33.5, 62.5],
+    zoom: 4.8,
+    maxZoom: 14
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+let selectedPointId = null;
+
+function syncRoutePointsMapData() {
+    if (!map.getSource('route-points')) return;
+    const groups = clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX);
+    map.getSource('route-points').setData(buildRoutePointsGeoJSON(points, selectedPointId, groups));
+}
+
+function mapClusterCoMembers(routePointId) {
+    const groups = clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX);
+    for (const indices of groups) {
+        if (indices.length < 2) continue;
+        const ids = indices.map(i => points[i].id).sort((a, b) => a - b);
+        if (!ids.includes(routePointId)) continue;
+        return ids.filter(x => x !== routePointId);
+    }
+    return null;
+}
+
+map.on('load', () => {
+    // Route line
+    map.addSource('route', {
+        type: 'geojson',
+        data: {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: points.map(p => [p.lon, p.lat]) }
+        }
+    });
+    map.addLayer({
+        id: 'route-line', type: 'line', source: 'route',
+        paint: { 'line-color': '#5c3e0e', 'line-width': 2, 'line-opacity': .6, 'line-dasharray': [4,3] }
+    });
+
+    map.addSource('route-points', {
+        type: 'geojson',
+        data: buildRoutePointsGeoJSON(points, null, clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX))
+    });
+
+    map.addLayer({
+        id: 'route-points-circles',
+        type: 'circle',
+        source: 'route-points',
+        paint: {
+            'circle-radius': [
+                'case',
+                ['all', ['==', ['get', 'kind'], 'cluster'], ['==', ['to-number', ['get', 'selected']], 1]], 23,
+                ['==', ['get', 'kind'], 'cluster'], 20,
+                ['==', ['to-number', ['get', 'selected']], 1], 12.5,
+                11
+            ],
+            'circle-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#ece6d8', '#f4efe4'],
+            'circle-stroke-width': ['case', ['==', ['to-number', ['get', 'selected']], 1], 2.5, 2],
+            'circle-stroke-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#2e1a04', '#5c3e0e']
+        }
+    });
+
+    map.addLayer({
+        id: 'route-points-labels',
+        type: 'symbol',
+        source: 'route-points',
+        layout: {
+            'text-field': ['get', 'label'],
+            'text-size': ['case', ['==', ['get', 'kind'], 'cluster'], 11, 12],
+            'text-font': ['Noto Sans Regular'],
+            'text-allow-overlap': true,
+            'text-ignore-placement': true
+        },
+        paint: {
+            'text-color': '#2e1a04',
+            'text-halo-color': '#f4efe4',
+            'text-halo-width': 2,
+            'text-halo-blur': 0.5,
+            'text-opacity-transition': { duration: 0, delay: 0 }
+        }
+    });
+
+    map.on('click', 'route-points-circles', e => {
+        const feats = map.queryRenderedFeatures(e.point, { layers: ['route-points-circles'] });
+        if (!feats.length) return;
+        const p = feats[0].properties;
+        const id = p.kind === 'cluster' ? Number(p.pickId) : Number(p.id);
+        selectPoint(id);
+    });
+    map.on('mouseenter', 'route-points-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'route-points-circles', () => { map.getCanvas().style.cursor = ''; });
+
+    let routePointsSyncRaf = null;
+    function scheduleRoutePointsSync() {
+        if (routePointsSyncRaf != null) return;
+        routePointsSyncRaf = requestAnimationFrame(() => {
+            routePointsSyncRaf = null;
+            syncRoutePointsMapData();
+        });
+    }
+    map.on('move', scheduleRoutePointsSync);
+    map.on('resize', syncRoutePointsMapData);
+    map.once('idle', syncRoutePointsMapData);
+});
+
+/* ══════════════════════════════════════════
+   SELECT POINT
+══════════════════════════════════════════ */
+function selectPoint(id) {
+    const pt = points.find(p => p.id === id);
+    if (!pt) return;
+
+    // Sidebar highlight
+    document.querySelectorAll('.point').forEach(el => el.classList.remove('active'));
+    const li = document.querySelector(`.point[data-id="${id}"]`);
+    if (li) { li.classList.add('active'); li.scrollIntoView({ block: 'nearest' }); }
+
+    selectedPointId = id;
+    syncRoutePointsMapData();
+
+    // Fly map
+    map.flyTo({ center: [pt.lon, pt.lat], zoom: 8, speed: 1.1, curve: 1.3 });
+
+    // On mobile: switch to description panel after selecting from list
+    if (window.innerWidth <= 768) setMobilePanel('center');
+
+    // Center panel
+    document.getElementById('center-empty').style.display = 'none';
+    const detail = document.getElementById('center-detail');
+    detail.classList.add('visible');
+    const co = mapClusterCoMembers(pt.id);
+    const mapClusterNote = co && co.length
+        ? `<p style="font-size:12.5px;color:var(--text-dim);margin:8px 0 0;font-style:italic;line-height:1.55">На карте один маркер объединяет близкие пункты (при текущем масштабе); рядом с этим — ещё: ${co.join(', ')}. Их можно открыть в списке слева.</p>`
+        : '';
+    detail.innerHTML = `
+        <div class="detail-num">Точка маршрута &nbsp;·&nbsp; ${pt.id} из ${points.length}</div>
+        <div class="detail-name">${pt.name}</div>
+        ${mapClusterNote}
+        <div class="divider"></div>
+        <div class="section-label">Географическое описание</div>
+        <div class="section-text">${pt.geo}</div>
+        <div class="section-label">Историческая справка</div>
+        <div class="section-text">${pt.history}</div>
+        <div class="section-label">Роль в очерках Пришвина</div>
+        <div class="section-text">${pt.role}</div>
+        ${pt.quote ? `<div class="quote-block">
+            <div class="quote-label">Цитата из сборника</div>
+            <p>${pt.quote}</p>
+        </div>` : ''}
+    `;
+    document.getElementById('center-scroll').scrollTop = 0;
+
+    // Photos
+    const photosEl = document.getElementById('photos-scroll');
+    if (pt.images && pt.images.length > 0) {
+        photosEl.innerHTML = pt.images.map(img => `
+            <div class="photo-item">
+                <img src="${img.src}" alt="${img.caption}" onerror="this.closest('.photo-item').style.display='none'">
+                ${img.caption ? `<div class="photo-caption">${img.caption}</div>` : ''}
+            </div>
+        `).join('');
+    } else {
+        photosEl.innerHTML = '<div id="photos-empty">Иллюстрации для этой точки отсутствуют</div>';
+    }
+}
+
+/* ══════════════════════════════════════════
+   SIDEBAR LIST
+══════════════════════════════════════════ */
 const listEl = document.getElementById('pointsList');
 points.forEach(pt => {
     const div = document.createElement('div');
     div.className = 'point';
-    div.innerHTML = `<div class="title">${pt.name}</div>`;
-    div.onclick = () => {
-        map.setView([pt.lat, pt.lon], 11);
-
-        // Собираем HTML для изображения, только если путь задан
-        const imgHTML = pt.image
-            ? `<img src="${pt.image}" style="max-width:100%;height:auto;margin:8px 0;" alt="${pt.name}">`
-            : '';
-
-        descriptionPopup
-            .setLatLng([pt.lat, pt.lon])
-            .setContent(`
-                <h3>${pt.name}</h3>
-                ${imgHTML}  <!-- Вставится ТОЛЬКО если pt.image есть -->
-                ${pt.desc}
-
-            `);
-        descriptionPopup.options.maxHeight = window.innerHeight * 0.45;
-        descriptionPopup.options.minHeight = window.innerHeight * 0.45;
-        descriptionPopup.options.maxWidth = window.innerWidth * 0.2;
-        descriptionPopup.options.minWidth = window.innerWidth * 0.2;
-
-        descriptionPopup.openOn(map);
-    };
+    div.dataset.id = pt.id;
+    div.innerHTML = `<div class="point-num">${pt.id}</div><div class="point-title">${pt.name}</div>`;
+    div.onclick = () => selectPoint(pt.id);
     listEl.appendChild(div);
 });
 
-// --- Полилиния маршрута ---
-const routeLine = L.polyline(points.map(p=>[p.lat,p.lon]), {
-    color:'#2b8cbe', weight:4
-}).addTo(map);
-
-// --- Кнопки ---
-document.getElementById('fitAll').onclick=()=>{
-    map.fitBounds(group.getBounds().pad(0.15));
-};
-let shown=true;
-document.getElementById('toggleRoute').onclick=()=>{
-    shown?map.removeLayer(routeLine):routeLine.addTo(map);
-    shown=!shown;
+/* ══════════════════════════════════════════
+   CONTROLS
+══════════════════════════════════════════ */
+document.getElementById('fitAll').onclick = () => {
+    const lons = points.map(p => p.lon), lats = points.map(p => p.lat);
+    map.fitBounds(
+        [[Math.min(...lons)-1, Math.min(...lats)-.5],[Math.max(...lons)+1, Math.max(...lats)+.5]],
+        { padding:30, duration:900 }
+    );
 };
 
-map.fitBounds(group.getBounds().pad(0.15));
-
+let routeShown = true;
+document.getElementById('toggleRoute').onclick = () => {
+    if (map.getLayer('route-line')) {
+        map.setLayoutProperty('route-line', 'visibility', routeShown ? 'none' : 'visible');
+        routeShown = !routeShown;
+    }
+};
 </script>
-
-<!-- Авторство -->
-<div id="creditLabel">
-    Сайт: Антон Лейманн<br>
-    Текст и идея: Арина Завьялова
-</div>
-
-<style>
-    #creditLabel {
-        position: fixed;
-        right: 12px;
-        bottom: 8px;
-        font-size: 12px;
-        color: rgba(0, 0, 0, 0.6);
-        background: rgba(255, 255, 255, 0.85);
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-family: Arial, sans-serif;
-        z-index: 9999;
-        pointer-events: none;
-    }
-
-    @media (max-width: 600px) {
-        #creditLabel {
-            font-size: 10px;
-            right: 6px;
-            bottom: 6px;
-        }
-    }
-</style>
-
 </body>
 </html>
-
