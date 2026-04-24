@@ -1123,37 +1123,41 @@ function buildRoutePointsGeoJSON(pts, selectedId, groups) {
 /* ══════════════════════════════════════════
    MAP
 ══════════════════════════════════════════ */
-const map = new maplibregl.Map({
-    container: 'map',
-    style: {
-        version: 8,
-        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-        sources: {
-            carto: {
-                type: 'raster',
-                tiles: [
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-                ],
-                tileSize: 256,
-                attribution: '&copy; OpenStreetMap contributors'
-            }
-        },
-        layers: [{
-            id: 'base', type: 'raster', source: 'carto',
-            paint: {
-                'raster-saturation': -0.45,
-                'raster-brightness-max': 0.82,
-                'raster-contrast': 0.08,
-                'raster-hue-rotate': 18
-            }
-        }]
-    },
-    center: [33.5, 62.5],
-    zoom: 4.8,
-    maxZoom: 14
-});
+let map = null;
+let selectedPointId = null;
 
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+// Безопасная инициализация карты
+if (typeof maplibregl !== 'undefined') {
+    map = new maplibregl.Map({
+        container: 'map',
+        style: {
+            version: 8,
+            glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+            sources: {
+                carto: {
+                    type: 'raster',
+                    tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+                    tileSize: 256,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }
+            },
+            layers: [{
+                id: 'base', type: 'raster', source: 'carto',
+                paint: {
+                    'raster-saturation': -0.45,
+                    'raster-brightness-max': 0.82,
+                    'raster-contrast': 0.08,
+                    'raster-hue-rotate': 18
+                }
+            }]
+        },
+        center: [33.5, 62.5],
+        zoom: 4.8,
+        maxZoom: 14
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
 
 let selectedPointId = null;
 
@@ -1253,6 +1257,9 @@ map.on('load', () => {
     map.on('resize', syncRoutePointsMapData);
     map.once('idle', syncRoutePointsMapData);
 });
+} else {
+    console.warn('MapLibre GL JS не загружена. Карта недоступна, но маршрут и описания работают.');
+}
 // делегирование навигации в слайдере
 document.getElementById('photos-scroll').addEventListener('click', (e) => {
     const btn = e.target.closest('.slider-prev, .slider-next');
