@@ -1125,12 +1125,9 @@ function buildRoutePointsGeoJSON(pts, selectedId, groups) {
 ══════════════════════════════════════════ */
 let map = null;
 let selectedPointId = null;
-let mapInitialized = false; // флаг, чтобы не создавать карту повторно
 
-function initMap() {
-    if (mapInitialized || typeof maplibregl === 'undefined') return;
-    mapInitialized = true;
-
+// Безопасная инициализация карты
+if (typeof maplibregl !== 'undefined') {
     map = new maplibregl.Map({
         container: 'map',
         style: {
@@ -1161,90 +1158,107 @@ function initMap() {
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-    map.on('load', () => {
-        // Route line
-        map.addSource('route', {
-            type: 'geojson',
-            data: {
-                type: 'Feature',
-                geometry: { type: 'LineString', coordinates: points.map(p => [p.lon, p.lat]) }
-            }
-        });
-        map.addLayer({
-            id: 'route-line', type: 'line', source: 'route',
-            paint: { 'line-color': '#5c3e0e', 'line-width': 2, 'line-opacity': .6, 'line-dasharray': [4,3] }
-        });
 
-        map.addSource('route-points', {
-            type: 'geojson',
-            data: buildRoutePointsGeoJSON(points, null, clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX))
-        });
+let selectedPointId = null;
 
-        map.addLayer({
-            id: 'route-points-circles',
-            type: 'circle',
-            source: 'route-points',
-            paint: {
-                'circle-radius': [
-                    'case',
-                    ['all', ['==', ['get', 'kind'], 'cluster'], ['==', ['to-number', ['get', 'selected']], 1]], 23,
-                    ['==', ['get', 'kind'], 'cluster'], 20,
-                    ['==', ['to-number', ['get', 'selected']], 1], 12.5,
-                    11
-                ],
-                'circle-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#ece6d8', '#f4efe4'],
-                'circle-stroke-width': ['case', ['==', ['to-number', ['get', 'selected']], 1], 2.5, 2],
-                'circle-stroke-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#2e1a04', '#5c3e0e']
-            }
-        });
-
-        map.addLayer({
-            id: 'route-points-labels',
-            type: 'symbol',
-            source: 'route-points',
-            layout: {
-                'text-field': ['get', 'label'],
-                'text-size': ['case', ['==', ['get', 'kind'], 'cluster'], 11, 12],
-                'text-font': ['Noto Sans Regular'],
-                'text-allow-overlap': true,
-                'text-ignore-placement': true
-            },
-            paint: {
-                'text-color': '#2e1a04',
-                'text-halo-color': '#f4efe4',
-                'text-halo-width': 2,
-                'text-halo-blur': 0.5,
-                'text-opacity-transition': { duration: 0, delay: 0 }
-            }
-        });
-
-        map.on('click', 'route-points-circles', e => {
-            const feats = map.queryRenderedFeatures(e.point, { layers: ['route-points-circles'] });
-            if (!feats.length) return;
-            const p = feats[0].properties;
-            const id = p.kind === 'cluster' ? Number(p.pickId) : Number(p.id);
-            selectPoint(id);
-        });
-        map.on('mouseenter', 'route-points-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', 'route-points-circles', () => { map.getCanvas().style.cursor = ''; });
-
-        let routePointsSyncRaf = null;
-        function scheduleRoutePointsSync() {
-            if (routePointsSyncRaf != null) return;
-            routePointsSyncRaf = requestAnimationFrame(() => {
-                routePointsSyncRaf = null;
-                syncRoutePointsMapData();
-            });
-        }
-        map.on('move', scheduleRoutePointsSync);
-        map.on('resize', syncRoutePointsMapData);
-        map.once('idle', syncRoutePointsMapData);
-    });
+function syncRoutePointsMapData() {
+    if (!map.getSource('route-points')) return;
+    const groups = clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX);
+    map.getSource('route-points').setData(buildRoutePointsGeoJSON(points, selectedPointId, groups));
 }
 
-// Сразу создаём карту, если ширина большая (десктоп)
-if (window.innerWidth > 768) {
-    initMap();
+function mapClusterCoMembers(routePointId) {
+    const groups = clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX);
+    for (const indices of groups) {
+        if (indices.length < 2) continue;
+        const ids = indices.map(i => points[i].id).sort((a, b) => a - b);
+        if (!ids.includes(routePointId)) continue;
+        return ids.filter(x => x !== routePointId);
+    }
+    return null;
+}
+
+map.on('load', () => {
+    // Route line
+    map.addSource('route', {
+        type: 'geojson',
+        data: {
+            type: 'Feature',
+            geometry: { type: 'LineString', coordinates: points.map(p => [p.lon, p.lat]) }
+        }
+    });
+    map.addLayer({
+        id: 'route-line', type: 'line', source: 'route',
+        paint: { 'line-color': '#5c3e0e', 'line-width': 2, 'line-opacity': .6, 'line-dasharray': [4,3] }
+    });
+
+    map.addSource('route-points', {
+        type: 'geojson',
+        data: buildRoutePointsGeoJSON(points, null, clusterPointIndicesByPixel(points, map, MAP_CLUSTER_PX))
+    });
+
+    map.addLayer({
+        id: 'route-points-circles',
+        type: 'circle',
+        source: 'route-points',
+        paint: {
+            'circle-radius': [
+                'case',
+                ['all', ['==', ['get', 'kind'], 'cluster'], ['==', ['to-number', ['get', 'selected']], 1]], 23,
+                ['==', ['get', 'kind'], 'cluster'], 20,
+                ['==', ['to-number', ['get', 'selected']], 1], 12.5,
+                11
+            ],
+            'circle-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#ece6d8', '#f4efe4'],
+            'circle-stroke-width': ['case', ['==', ['to-number', ['get', 'selected']], 1], 2.5, 2],
+            'circle-stroke-color': ['case', ['==', ['to-number', ['get', 'selected']], 1], '#2e1a04', '#5c3e0e']
+        }
+    });
+
+    map.addLayer({
+        id: 'route-points-labels',
+        type: 'symbol',
+        source: 'route-points',
+        layout: {
+            'text-field': ['get', 'label'],
+            'text-size': ['case', ['==', ['get', 'kind'], 'cluster'], 11, 12],
+            'text-font': ['Noto Sans Regular'],
+            'text-allow-overlap': true,
+            'text-ignore-placement': true
+        },
+        paint: {
+            'text-color': '#2e1a04',
+            'text-halo-color': '#f4efe4',
+            'text-halo-width': 2,
+            'text-halo-blur': 0.5,
+            'text-opacity-transition': { duration: 0, delay: 0 }
+        }
+    });
+
+    map.on('click', 'route-points-circles', e => {
+        const feats = map.queryRenderedFeatures(e.point, { layers: ['route-points-circles'] });
+        if (!feats.length) return;
+        const p = feats[0].properties;
+        const id = p.kind === 'cluster' ? Number(p.pickId) : Number(p.id);
+        selectPoint(id);
+    });
+    map.on('mouseenter', 'route-points-circles', () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'route-points-circles', () => { map.getCanvas().style.cursor = ''; });
+
+    let routePointsSyncRaf = null;
+    function scheduleRoutePointsSync() {
+        if (routePointsSyncRaf != null) return;
+        routePointsSyncRaf = requestAnimationFrame(() => {
+            routePointsSyncRaf = null;
+            syncRoutePointsMapData();
+        });
+    }
+    map.on('move', scheduleRoutePointsSync);
+    map.on('resize', syncRoutePointsMapData);
+    map.once('idle', syncRoutePointsMapData);
+});
+} else {
+    console.warn('MapLibre GL JS не загружена. Карта недоступна, но маршрут и описания работают.');
 }
 // делегирование навигации в слайдере
 document.getElementById('photos-scroll').addEventListener('click', (e) => {
