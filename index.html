@@ -805,7 +805,21 @@ function setMobilePanel(panelId) {
     document.querySelectorAll('.mob-tab').forEach(t => {
         t.classList.toggle('active', t.dataset.panel === panelId);
     });
-    if (panelId === 'right' && map) setTimeout(() => map.resize(), 80);
+    if (panelId === 'right' && map) {
+        // Даём браузеру время на пересчёт лэйаута
+        setTimeout(() => {
+            map.resize();
+            // Принудительно обновляем источник точек
+            if (map.getSource('route-points')) {
+                syncRoutePointsMapData();
+            } else {
+                // Если источник ещё не создан (редкий случай) – пробуем перезагрузить стиль
+                map.once('idle', () => {
+                    if (map.getSource('route-points')) syncRoutePointsMapData();
+                });
+            }
+        }, 150);
+    }
 }
 
 document.querySelectorAll('.mob-tab').forEach(tab => {
